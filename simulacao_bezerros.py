@@ -113,10 +113,7 @@ if st.button("Calcular rendimento CDI e Evolução do Bezerro"):
         # Exibir a tabela
         st.subheader("Evolução do Peso e Lucros")
         st.table(tabela_cenarios)
-
-
-    
-        
+      
         # Calcular o rendimento acumulado do CDI
         valor_compra = preco_kg * peso_inicial
         rendimento_cdi = valor_compra * (1 + sum(previsao) / 100)
