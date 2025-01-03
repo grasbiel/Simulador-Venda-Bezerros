@@ -107,7 +107,6 @@ if st.button("Calcular rendimento CDI e Evolução do Bezerro"):
         # Criar a tabela de resultados 
         tabela_cenarios = pd.DataFrame({
             "Período (Meses)": [r[0] for r in resultados_melhor_cenario],
-            "Valor de Compra R$": [r[2] for r in resultados_melhor_cenario],
             "Peso (Pior Cenário)": [r[1] for r in resultados_pior_cenario],
             "Peso (Melhor Cenário)": [r[1] for r in resultados_melhor_cenario],
             "Lucro (Pior Cenário)": [r[3] for r in resultados_pior_cenario],
