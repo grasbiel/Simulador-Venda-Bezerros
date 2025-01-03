@@ -5,11 +5,11 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
-
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 # Função para calcular o custo de compra, receita das vendas, lucro e retorno percentual
 def calcular_retorno_completo (preco_kg, peso_inicial, preco_final, tempo_meses, fee_criador):
-    print(f"Taxa fee {fee_criador}")
+    
     # Armazenar os resultados
     resultados_melhor_cenario = []
     resultados_pior_cenario = []
@@ -71,6 +71,17 @@ def prever_taxas_cdi (taxas, tempo_meses):
 
     return previsoes
 
+def prever_taxas_cdi_SARIMAX (taxas, tempo_meses):
+    # Criar o modelo SARIMA
+    modelo = SARIMAX(taxas, order=(1,1,1), seasonal_order=(1,0,1,12))
+    resultado = modelo.fit(disp=False)
+
+
+    # Fazer previsões
+    previsoes = resultado.get_forecast(steps=tempo_meses)
+    taxas_previstas = previsoes.predicted_mean
+    return taxas_previstas.tolist()
+
 def calcular_peso_trimestral(peso_inicial, meses, otimista=True):
     ganho_mensal = 10 if otimista else 5
     peso_estimado = peso_inicial + ganho_mensal * meses
@@ -99,10 +110,15 @@ if st.button("Calcular rendimento CDI e Evolução do Bezerro"):
     if taxas_cdi:        
 
         # Prever as taxas de CDI futuras com o modelo
-        previsao = prever_taxas_cdi(taxas_cdi, tempo_meses)
+        previsao = prever_taxas_cdi_SARIMAX(taxas_cdi, tempo_meses)
 
         # Exibindo resultados do melhor e pior cenário para o bezerro
         resultados_melhor_cenario, resultados_pior_cenario = calcular_retorno_completo(preco_kg, peso_inicial, preco_final, tempo_meses, fee_criador)
+
+        # Calcular o rendimento acumulado do CDI
+        valor_compra = preco_kg * peso_inicial
+        rendimento_cdi = valor_compra * (1 + sum(previsao) / 100)
+        rendimento_cdi_trimestral = [calcular_rendimento_cdi(valor_compra, previsao[:i]) for i in range(1, len(resultados_melhor_cenario) + 1)]
 
         # Criar a tabela de resultados 
         tabela_cenarios = pd.DataFrame({
@@ -111,15 +127,14 @@ if st.button("Calcular rendimento CDI e Evolução do Bezerro"):
             "Peso (Melhor Cenário)": [r[1] for r in resultados_melhor_cenario],
             "Lucro (Pior Cenário)": [r[3] for r in resultados_pior_cenario],
             "Lucro (Melhor Cenário)": [r[3] for r in resultados_melhor_cenario],
+            "Rendimento CDI Previsto (R$)": rendimento_cdi_trimestral
         })
 
         # Exibir a tabela
         st.subheader("Evolução do Peso e Lucros")
         st.table(tabela_cenarios)
       
-        # Calcular o rendimento acumulado do CDI
-        valor_compra = preco_kg * peso_inicial
-        rendimento_cdi = valor_compra * (1 + sum(previsao) / 100)
+        
         
         st.markdown(f"Valor de Compra: R$ {valor_compra:.2f}")
 
