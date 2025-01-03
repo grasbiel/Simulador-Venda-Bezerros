@@ -3,9 +3,13 @@ import requests
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+
 
 # Função para calcular o custo de compra, receita das vendas, lucro e retorno percentual
 def calcular_retorno_completo (preco_kg, peso_inicial, preco_final, tempo_meses, fee_criador):
@@ -61,16 +65,6 @@ def obter_taxas_cdi():
         return []
     
 # Função para prever as taxas CDI com base no histórico
-def prever_taxas_cdi (taxas, tempo_meses):
-    indices = np.arange(len(taxas_cdi)).reshape(-1,1)
-    modelo = LinearRegression()
-    modelo.fit(indices, taxas)
-
-    novos_indices = np.arange(len(taxas), len(taxas) +tempo_meses).reshape(-1,1)
-    previsoes = modelo.predict(novos_indices)
-
-    return previsoes
-
 def prever_taxas_cdi_SARIMAX (taxas, tempo_meses):
     # Criar o modelo SARIMA
     modelo = SARIMAX(taxas, order=(1,1,1), seasonal_order=(1,0,1,12))
@@ -81,6 +75,38 @@ def prever_taxas_cdi_SARIMAX (taxas, tempo_meses):
     previsoes = resultado.get_forecast(steps=tempo_meses)
     taxas_previstas = previsoes.predicted_mean
     return taxas_previstas.tolist()
+
+
+def preparar_dados(taxas, look_back=12):
+    # Normalizar dados
+    scaler = MinMaxScaler(feature_range=(0,1))
+    taxas_normalizadas = scaler.fit_transform(np.array(taxas).reshape(-1,1))
+
+    # Criar as sequências de entrada (X) e saída (Y)
+    X, y= [], []
+
+    for i in range(len(taxas_normalizadas) - look_back):
+        X.append(taxas_normalizadas[i: i + look_back, 0])
+        y.append(taxas_normalizadas[i + look_back, 0])
+        
+    return np.array(X), np.array(y), scaler
+        
+def criar_modelo_lstm(look_back):
+    model= Sequential([
+        LSTM(50, return_sequences= True, input_shape=(look_back,1)),
+        Dropout(0.2),
+        LSTM(50, return_sequences= False),
+        Dropout(0.2),
+        Dense(1) # Saída única para prever a próxima taxa
+    ])
+
+    model.compile(optimizer='adam', loss='mean_squared_error')
+    return model
+
+# Preparar os dados
+
+look_back = 12
+X,y = 
 
 def calcular_peso_trimestral(peso_inicial, meses, otimista=True):
     ganho_mensal = 10 if otimista else 5
