@@ -8,10 +8,11 @@ import matplotlib.pyplot as plt
 
 
 # Função para calcular o custo de compra, receita das vendas, lucro e retorno percentual
-def calcular_retorno_completo (preco_kg, peso_inicial, preco_final, tempo_meses):
+def calcular_retorno_completo (preco_kg, peso_inicial, preco_final, tempo_meses, fee_criador):
+    print(f"Taxa fee {fee_criador}")
+    # Armazenar os resultados
     resultados_melhor_cenario = []
     resultados_pior_cenario = []
-
 
     # Estimativa de peso trimestral
     for trimestre in range(0, tempo_meses + 1, 3):
@@ -19,20 +20,23 @@ def calcular_retorno_completo (preco_kg, peso_inicial, preco_final, tempo_meses)
         peso_pior_cenario = calcular_peso_trimestral(peso_inicial, trimestre, otimista=False)
     
         valor_compra = preco_kg * peso_inicial
-        # Calculando o lucro com a regra de 40% sobre a diferença enter o peso final e o peso inicial
-        # Você recebe 40% da diferença entre o peso da venda e o peso inicial
+        print(f"Taxa cliente {porcentagem_cliente(fee_criador)}")
+        # Calculando o lucro com a regra de % sobre a diferença enter o peso final e o peso inicial
+        # Você recebe uma % da diferença entre o peso da venda e o peso inicial que o criador do bezerro cobra
+        lucro_melhor = valor_compra + porcentagem_cliente(fee_criador) * calcular_lucro_peso(peso_inicial, peso_melhor_cenario, preco_final)
+        lucro_pior = valor_compra + porcentagem_cliente(fee_criador) * calcular_lucro_peso(peso_inicial, peso_pior_cenario, preco_final)
 
-        lucro_melhor = valor_compra + 0.4 * (preco_final * peso_melhor_cenario - preco_kg * peso_inicial)
-        lucro_pior = valor_compra + 0.4 * (preco_final* peso_pior_cenario - preco_kg * peso_inicial)
-        valor_venda_melhor = preco_final * peso_melhor_cenario
-        valor_venda_pior = preco_final * peso_pior_cenario
-
-
-        
-        resultados_melhor_cenario.append((trimestre, peso_melhor_cenario, valor_compra, valor_venda_melhor, lucro_melhor))
-        resultados_pior_cenario.append((trimestre,peso_pior_cenario, valor_compra, valor_venda_pior, lucro_pior))
+        resultados_melhor_cenario.append((trimestre, peso_melhor_cenario, valor_compra, lucro_melhor))
+        resultados_pior_cenario.append((trimestre,peso_pior_cenario, valor_compra, lucro_pior))
     
     return resultados_melhor_cenario, resultados_pior_cenario
+
+# Função que recebe a taxa de FEE que o CRIADOR do bezerro cobra e retorna o inverso para calcular o lucro do cliente
+def porcentagem_cliente(taxa_fee):
+    return (1 - (taxa_fee/100)) 
+
+def calcular_lucro_peso (peso_inicial, peso_final, preco_venda):
+    return preco_venda * (peso_final- peso_inicial)
 
 # Função de cálculo do rendimento do CDI
 def calcular_rendimento_cdi (valor_investido, cdi_taxas):
@@ -46,7 +50,6 @@ def calcular_rendimento_cdi (valor_investido, cdi_taxas):
 def obter_taxas_cdi():
     url = f'https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados?formato=json'
     response= requests.get(url)
-
 
     if response.status_code == 200:
         dados = response.json()
@@ -85,6 +88,7 @@ preco_kg = st.number_input("Preço por kg na compra (R$):", min_value= 0.0, valu
 peso_inicial = st.number_input("Peso inicial do bezerro (kg):", min_value=0.0, value=100.0, step=1.0)
 data_compra = st.date_input("Data de compra do bezerro:", value = datetime.now())
 preco_final = st.number_input("Preço por kg na venda (R$):", min_value=0.0, value=20.0, step=0.1)
+fee_criador = st.number_input("Fee criador (%):", min_value=10.0, value=50.0, step=10.0)
 tempo_meses = st.slider("Tempo máximo para engordar e venda (meses): ", min_value=1, max_value=18, value=18, step=1)
 
 
@@ -98,7 +102,7 @@ if st.button("Calcular rendimento CDI e Evolução do Bezerro"):
         previsao = prever_taxas_cdi(taxas_cdi, tempo_meses)
 
         # Exibindo resultados do melhor e pior cenário para o bezerro
-        resultados_melhor_cenario, resultados_pior_cenario = calcular_retorno_completo(preco_kg, peso_inicial, preco_final, tempo_meses)
+        resultados_melhor_cenario, resultados_pior_cenario = calcular_retorno_completo(preco_kg, peso_inicial, preco_final, tempo_meses, fee_criador)
 
         # Criar a tabela de resultados 
         tabela_cenarios = pd.DataFrame({
@@ -119,7 +123,8 @@ if st.button("Calcular rendimento CDI e Evolução do Bezerro"):
         rendimento_cdi = valor_compra * (1 + sum(previsao) / 100)
         
         st.markdown(f"Valor de Compra: R$ {valor_compra:.2f}")
-        st.markdown(f"Valor de Compra: R$ {rendimento_cdi:.2f}")
+
+        
 
         # Plotar o gráfico com os três valores no retorno
         valor_venda_melhor = resultados_melhor_cenario[-1][3]
