@@ -124,26 +124,33 @@ if st.button("Calcular rendimento CDI e Evolução do Bezerro"):
         
         st.markdown(f"Valor de Compra: R$ {valor_compra:.2f}")
 
-        
+        # Calcular a evolução mensal (ou trimestral)
+        datas = [data_compra + timedelta(days=30*i) for i in range(tempo_meses + 1)]
+        cdi_acumulado = [calcular_rendimento_cdi(valor_compra, previsao[:i]) for i in range(1, len(datas) + 1)]
+        melhor_cenario = [resultado[3] for resultado in resultados_melhor_cenario]
+        pior_cenario = [resultado[3] for resultado in resultados_pior_cenario]
 
-        # Plotar o gráfico com os três valores no retorno
-        valor_venda_melhor = resultados_melhor_cenario[-1][3]
-        valor_venda_pior = resultados_pior_cenario[-1][3]
+        # Ajustar datas para trimestrais
+        datas_trimestrais = datas[::3]
+        cdi_trimestral = cdi_acumulado[::3]
+        melhor_cenario_trimestral = melhor_cenario
+        pior_cenario_trimestral = pior_cenario
 
-        st.subheader("Comparação de Retornos")
-        fig, ax= plt.subplots()
-        categorias = ['CDI Previsto', 'Venda (Pior Cenário)', 'Venda (Melhor Cenário)']
-        valores = [rendimento_cdi, valor_venda_pior, valor_venda_melhor]
+        # Plotar o gráfico histórico
+        st.subheader("Evolução Mensal dos Retornos")
+        fig, ax = plt.subplots(figsize=(10,6))
+        ax.plot(datas_trimestrais, cdi_trimestral, label="CDI Previsto", marker='o', color='blue')
+        ax.plot(datas_trimestrais, melhor_cenario_trimestral, label="Melhor Cenário", marker='o', color='green')
+        ax.plot(datas_trimestrais, pior_cenario_trimestral, label="Pior Cenário", marker='o', color='red')
 
-        ax.bar(categorias, valores, color=['blue', 'red', 'green'])
-        ax.set_ylabel("Valores (R$)")
-        ax.set_title("Comparação de Retornos")
+        ax.set_xlabel("Data")
+        ax.set_ylabel("Valor (R$)")
+        ax.set_title("Evolução Trimestral dos Retornos")
+        ax.legend()
+        ax.grid()
 
-        for i, v in enumerate(valores):
-            ax.text(i, v+ 50, f"R$ {v:.2f}", ha="center", va="bottom")
 
         st.pyplot(fig)
-
     else:
         st.error("Não foi possível calcular o rendimento no CDI devido à ausendia de dados.")
     
