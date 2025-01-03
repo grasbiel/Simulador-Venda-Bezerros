@@ -106,7 +106,7 @@ def criar_modelo_lstm(look_back):
 # Preparar os dados
 
 look_back = 12
-X,y = 
+X,y = 0
 
 def calcular_peso_trimestral(peso_inicial, meses, otimista=True):
     ganho_mensal = 10 if otimista else 5
