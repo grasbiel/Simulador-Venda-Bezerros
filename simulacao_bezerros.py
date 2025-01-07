@@ -57,14 +57,14 @@ def obter_taxas_cdi():
         # Converter os dados para DataFrame
         df = pd.DataFrame(dados)
 
-        df['Data']= pd.to_datetime(df['data'], format='%d/%m/%Y')
-        df['Valor'] = df['valor'].astype(float) # Converte os valores para float
+        df['data']= pd.to_datetime(df['data'], format='%d/%m/%Y')
+        df['valor'] = df['valor'].astype(float) # Converte os valores para float
 
         # Definir a coluna 'data' como índice
         df.set_index('data', inplace=True)
 
         # Agrupar por mês e calcular a média
-        df_mensal = df.resample('M', on='data').mean()
+        df_mensal = df.resample('M').mean()
 
         # Retornar apenas a coluna de valores
         return df_mensal['valor'].tolist()
