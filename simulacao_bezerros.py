@@ -56,8 +56,12 @@ def obter_taxas_cdi():
 
         # Converter os dados para DataFrame
         df = pd.DataFrame(dados)
+
         df['Data']= pd.to_datetime(df['data'], format='%d/%m/%Y')
-        df['Valor'] = df['valor'].astype(float)
+        df['Valor'] = df['valor'].astype(float) # Converte os valores para float
+
+        # Definir a coluna 'data' como índice
+        df.set_index('data', inplace=True)
 
         # Agrupar por mês e calcular a média
         df_mensal = df.resample('M', on='data').mean()
@@ -72,13 +76,12 @@ def obter_taxas_cdi():
         
 def visualizar_taxas (taxas):
     plt.figure(figsize=(10,5))
-    plt.plot(taxas, label="Histórico do CDI")
-    plt.title("Série Temporal do CDI")
-    plt.xlabel("Período")
+    plt.plot(taxas, marker='o', linestyle='-', label="CDI Mensal")
+    plt.title("Taxa CDI Média Mensal")
+    plt.xlabel("Período(Meses)")
     plt.ylabel("Taxa (%)")
     plt.legend()
     plt.grid(True)
-    
     st.pyplot(plt)
 
 def calcular_peso_trimestral(peso_inicial, meses, otimista=True):
