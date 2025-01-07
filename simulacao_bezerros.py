@@ -3,12 +3,8 @@ import requests
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
-from statsmodels.tsa.statespace.sarimax import SARIMAX
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+from previsoes_cdi import preparar_dados, treinar_modelo, prever_taxas_cdi_lstm
 
 
 # Função para calcular o custo de compra, receita das vendas, lucro e retorno percentual
@@ -24,7 +20,7 @@ def calcular_retorno_completo (preco_kg, peso_inicial, preco_final, tempo_meses,
         peso_pior_cenario = calcular_peso_trimestral(peso_inicial, trimestre, otimista=False)
     
         valor_compra = preco_kg * peso_inicial
-        print(f"Taxa cliente {porcentagem_cliente(fee_criador)}")
+        
         # Calculando o lucro com a regra de % sobre a diferença enter o peso final e o peso inicial
         # Você recebe uma % da diferença entre o peso da venda e o peso inicial que o criador do bezerro cobra
         lucro_melhor = valor_compra + porcentagem_cliente(fee_criador) * calcular_lucro_peso(peso_inicial, peso_melhor_cenario, preco_final)
@@ -57,56 +53,33 @@ def obter_taxas_cdi():
 
     if response.status_code == 200:
         dados = response.json()
-        taxas = [float(item['valor']) for item in dados]
-        return taxas
+
+        # Converter os dados para DataFrame
+        df = pd.DataFrame(dados)
+        df['Data']= pd.to_datetime(df['data'], format='%d/%m/%Y')
+        df['Valor'] = df['valor'].astype(float)
+
+        # Agrupar por mês e calcular a média
+        df_mensal = df.resample('M', on='data').mean()
+
+        # Retornar apenas a coluna de valores
+        return df_mensal['valor'].tolist()
     
     else:
         st.error('Não foi possível obter os dados do CDI.')
         return []
     
-# Função para prever as taxas CDI com base no histórico
-def prever_taxas_cdi_SARIMAX (taxas, tempo_meses):
-    # Criar o modelo SARIMA
-    modelo = SARIMAX(taxas, order=(1,1,1), seasonal_order=(1,0,1,12))
-    resultado = modelo.fit(disp=False)
-
-
-    # Fazer previsões
-    previsoes = resultado.get_forecast(steps=tempo_meses)
-    taxas_previstas = previsoes.predicted_mean
-    return taxas_previstas.tolist()
-
-
-def preparar_dados(taxas, look_back=12):
-    # Normalizar dados
-    scaler = MinMaxScaler(feature_range=(0,1))
-    taxas_normalizadas = scaler.fit_transform(np.array(taxas).reshape(-1,1))
-
-    # Criar as sequências de entrada (X) e saída (Y)
-    X, y= [], []
-
-    for i in range(len(taxas_normalizadas) - look_back):
-        X.append(taxas_normalizadas[i: i + look_back, 0])
-        y.append(taxas_normalizadas[i + look_back, 0])
         
-    return np.array(X), np.array(y), scaler
-        
-def criar_modelo_lstm(look_back):
-    model= Sequential([
-        LSTM(50, return_sequences= True, input_shape=(look_back,1)),
-        Dropout(0.2),
-        LSTM(50, return_sequences= False),
-        Dropout(0.2),
-        Dense(1) # Saída única para prever a próxima taxa
-    ])
-
-    model.compile(optimizer='adam', loss='mean_squared_error')
-    return model
-
-# Preparar os dados
-
-look_back = 12
-X,y = 0
+def visualizar_taxas (taxas):
+    plt.figure(figsize=(10,5))
+    plt.plot(taxas, label="Histórico do CDI")
+    plt.title("Série Temporal do CDI")
+    plt.xlabel("Período")
+    plt.ylabel("Taxa (%)")
+    plt.legend()
+    plt.grid(True)
+    
+    st.pyplot(plt)
 
 def calcular_peso_trimestral(peso_inicial, meses, otimista=True):
     ganho_mensal = 10 if otimista else 5
@@ -121,22 +94,36 @@ st.title(title)
 
 # Entrada de dados pelo usuário
 st.header("Dados do investimento e previsão")
-preco_kg = st.number_input("Preço por kg na compra (R$):", min_value= 0.0, value= 17.0, step=0.1)
+preco_kg = st.number_input("Preço por kg na compra (R$):", min_value= 0.0, value= 17.0, step=1.0)
 peso_inicial = st.number_input("Peso inicial do bezerro (kg):", min_value=0.0, value=100.0, step=1.0)
 data_compra = st.date_input("Data de compra do bezerro:", value = datetime.now())
-preco_final = st.number_input("Preço por kg na venda (R$):", min_value=0.0, value=20.0, step=0.1)
-fee_criador = st.number_input("Fee criador (%):", min_value=10.0, value=50.0, step=10.0)
-tempo_meses = st.slider("Tempo máximo para engordar e venda (meses): ", min_value=1, max_value=18, value=18, step=1)
+preco_final = st.number_input("Preço por kg na venda (R$):", min_value=0.0, value=20.0, step=0.5)
+fee_criador = st.number_input("Fee criador (%):", min_value=10.0, value=50.0, step=5.0)
+tempo_meses = st.slider("Tempo máximo para engordar e venda (meses): ", min_value=1, max_value=18, value=18, step=3)
 
+
+
+# Obter taxas CDI históricas
+taxas_cdi = obter_taxas_cdi()
+
+if st.button("Visualizar histórico do CDI"):
+    taxas_cdi = obter_taxas_cdi()
+    if taxas_cdi:
+        visualizar_taxas(taxas_cdi)
+
+    else:
+        st.error("Não foi possível obter os dados do CDI")
 
 if st.button("Calcular rendimento CDI e Evolução do Bezerro"):
     
-    # Obter taxas CDI históricas
-    taxas_cdi = obter_taxas_cdi()
     if taxas_cdi:        
 
-        # Prever as taxas de CDI futuras com o modelo
-        previsao = prever_taxas_cdi_SARIMAX(taxas_cdi, tempo_meses)
+        # Prever os dados e treinar o modelo
+        modelo, scaler, look_back= treinar_modelo(taxas_cdi)
+
+
+        # Fazer a previsão
+        previsao = prever_taxas_cdi_lstm(modelo, taxas_cdi, scaler, look_back, tempo_meses)
 
         # Exibindo resultados do melhor e pior cenário para o bezerro
         resultados_melhor_cenario, resultados_pior_cenario = calcular_retorno_completo(preco_kg, peso_inicial, preco_final, tempo_meses, fee_criador)
@@ -160,8 +147,7 @@ if st.button("Calcular rendimento CDI e Evolução do Bezerro"):
         st.subheader("Evolução do Peso e Lucros")
         st.table(tabela_cenarios)
       
-        
-        
+
         st.markdown(f"Valor de Compra: R$ {valor_compra:.2f}")
 
         # Calcular a evolução mensal (ou trimestral)
