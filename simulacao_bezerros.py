@@ -58,7 +58,7 @@ def obter_taxas_cdi():
         df = pd.DataFrame(dados)
 
         df['data']= pd.to_datetime(df['data'], format='%d/%m/%Y')
-        df['valor'] = df['valor'].astype(float) # Converte os valores para float
+        df['valor'] = df['valor'].astype(float)/100 # Converte os valores para float
 
         # Definir a coluna 'data' como índice
         df.set_index('data', inplace=True)
@@ -66,8 +66,10 @@ def obter_taxas_cdi():
         # Agrupar por mês e calcular a média
         df_mensal = df.resample('M').mean()
 
+        df_mensal['valor_anualizado'] = ((1+ df_mensal['valor']) ** 12) - 1
+
         # Retornar apenas a coluna de valores
-        return df_mensal['valor'].tolist()
+        return df_mensal['valor_anualizado'].tolist(), df_mensal.index.strftime('%b/%Y').tolist()
     
     else:
         st.error('Não foi possível obter os dados do CDI.')
@@ -79,7 +81,8 @@ def visualizar_taxas (taxas):
     plt.plot(taxas, marker='o', linestyle='-', label="CDI Mensal")
     plt.title("Taxa CDI Média Mensal")
     plt.xlabel("Período(Meses)")
-    plt.ylabel("Taxa (%)")
+    plt.ylabel("Taxa Anualizada (%)")
+    plt.xticks(rotation=45)
     plt.legend()
     plt.grid(True)
     st.pyplot(plt)
