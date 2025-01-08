@@ -127,6 +127,10 @@ if st.button("Visualizar histórico do CDI"):
     if not taxas_cdi.empty:
         visualizar_taxas(taxas_cdi)
 
+        st.subheader("Taxas CDI Últimos 5 anos")
+        ultimos_5anos= taxas_cdi.tail(5)[['Ano', 'Valor_Acumulado']]
+        st.table(ultimos_5anos)
+
     else:
         st.error("Não foi possível obter os dados do CDI")
 
