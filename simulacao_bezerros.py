@@ -80,20 +80,20 @@ def obter_taxas_cdi():
             # Retornar apenas a coluna de valores
             return df_anual
     
-        except ValueError:
-            st.error("Erro ao decodificar JSON. Verifique a resposta da API")
-            return [], []
+        except Exception as e:
+            st.error(f'Error ao processar os dados:{e}')
+            return pd.DataFrame()
     else:
         st.error(f'Erro na requisição: {response.status_code}')
         st.write(response.text)
-        return [], []
+        return pd.DataFrame()
                 
 def visualizar_taxas (taxas):
 
     st.subheader("Taxas CDI Anual (12 meses)")
     fig = px.line(taxas, x= 'Ano', y= 'Valor_Acumulado', markers=True, title= 'Histórico das taxas CDI Acumuladas Anualmente')
     fig.update_layout(
-        xaxis_titlte='Ano',
+        xaxis_title='Ano',
         yaxis_title='CDI Acumulado (%)',
         hovermode= 'x unified',
         template= 'plotly_dark'
@@ -124,7 +124,7 @@ tempo_meses = st.slider("Tempo máximo para engordar e venda (meses): ", min_val
 taxas_cdi = obter_taxas_cdi()
 
 if st.button("Visualizar histórico do CDI"):
-    if taxas_cdi:
+    if not taxas_cdi.empty:
         visualizar_taxas(taxas_cdi)
 
     else:
@@ -132,7 +132,7 @@ if st.button("Visualizar histórico do CDI"):
 
 if st.button("Calcular rendimento CDI e Evolução do Bezerro"):
     
-    if taxas_cdi:        
+    if not taxas_cdi.empty:        
 
         # Prever os dados e treinar o modelo
         modelo, scaler, look_back= treinar_modelo(taxas_cdi)
