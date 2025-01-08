@@ -1,9 +1,9 @@
 import streamlit as st
 import requests
 from datetime import datetime, timedelta
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import plotly.express as px
 from previsoes_cdi import preparar_dados, treinar_modelo, prever_taxas_cdi_lstm
 
 
@@ -49,50 +49,62 @@ def calcular_rendimento_cdi (valor_investido, cdi_taxas):
 
 def obter_taxas_cdi():
     url = f'https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados?formato=json'
-    response= requests.get(url)
+    response = requests.get(url)
 
     if response.status_code == 200:
-        dados = response.json()
+        try:
+            dados = response.json()
 
-        # Converter os dados para DataFrame
-        df = pd.DataFrame(dados)
+            # Converter os dados para DataFrame
+            df = pd.DataFrame(dados)
 
-        df['data']= pd.to_datetime(df['data'], format='%d/%m/%Y')
-        df['valor'] = df['valor'].astype(float)/100 # Converte os valores para float
+            df['data']= pd.to_datetime(df['data'], format='%d/%m/%Y')
+            df['valor'] = df['valor'].astype(float)/100 # Converte os valores para float
 
-        # Definir a coluna 'data' como índice
-        df.set_index('data', inplace=True)
+            # Definir a coluna 'data' como índice
+            df.set_index('data', inplace=True)
 
-        # Agrupar por mês e calcular a média
-        df_mensal = df.resample('M').mean()
+            # Calcular o CDI acumulado dentro de cada ano
+            df['fator_acumulado'] = (1+ df['valor']).cumprod() # Produtor acumulado
+            df_anual = df.resample('YE').last() # Pega o último valor do ano
 
-        df_mensal['valor_anualizado'] = ((1+ df_mensal['valor']) ** 12) - 1
+            # Calcular a taxa acumulada do ano
+            df_anual['valor_acumulado'] = (df_anual['fator_acumulado']/ df['fator_acumulado'].shift(1) - 1) * 100
 
-        # Retornar apenas a coluna de valores
-        return df_mensal['valor_anualizado'].tolist(), df_mensal.index.strftime('%b/%Y').tolist()
+            # Resetar índice para usar como coluna no gráfico
+            df_anual = df_anual.reset_index()
+
+            # Renomear colunas para o gráfico
+            df_anual.columns = ['Ano', 'Valor_Medido', 'Fator_Acumulado', 'Valor_Acumulado']
+
+            # Retornar apenas a coluna de valores
+            return df_anual
     
+        except ValueError:
+            st.error("Erro ao decodificar JSON. Verifique a resposta da API")
+            return [], []
     else:
-        st.error('Não foi possível obter os dados do CDI.')
-        return []
-    
-        
+        st.error(f'Erro na requisição: {response.status_code}')
+        st.write(response.text)
+        return [], []
+                
 def visualizar_taxas (taxas):
-    plt.figure(figsize=(10,5))
-    plt.plot(taxas, marker='o', linestyle='-', label="CDI Mensal")
-    plt.title("Taxa CDI Média Mensal")
-    plt.xlabel("Período(Meses)")
-    plt.ylabel("Taxa Anualizada (%)")
-    plt.xticks(rotation=45)
-    plt.legend()
-    plt.grid(True)
-    st.pyplot(plt)
+
+    st.subheader("Taxas CDI Anual (12 meses)")
+    fig = px.line(taxas, x= 'Ano', y= 'Valor_Acumulado', markers=True, title= 'Histórico das taxas CDI Acumuladas Anualmente')
+    fig.update_layout(
+        xaxis_titlte='Ano',
+        yaxis_title='CDI Acumulado (%)',
+        hovermode= 'x unified',
+        template= 'plotly_dark'
+    )
+    st.plotly_chart(fig)
 
 def calcular_peso_trimestral(peso_inicial, meses, otimista=True):
     ganho_mensal = 10 if otimista else 5
     peso_estimado = peso_inicial + ganho_mensal * meses
     peso_maximo = 300 if otimista else 250
     return min(peso_estimado, peso_maximo)
-
 
 # Configuração dos títulos
 title = "Simulação de Investimento em Bezerros"
@@ -108,12 +120,10 @@ fee_criador = st.number_input("Fee criador (%):", min_value=10.0, value=50.0, st
 tempo_meses = st.slider("Tempo máximo para engordar e venda (meses): ", min_value=1, max_value=18, value=18, step=3)
 
 
-
 # Obter taxas CDI históricas
 taxas_cdi = obter_taxas_cdi()
 
 if st.button("Visualizar histórico do CDI"):
-    taxas_cdi = obter_taxas_cdi()
     if taxas_cdi:
         visualizar_taxas(taxas_cdi)
 
