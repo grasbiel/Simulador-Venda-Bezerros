@@ -69,7 +69,7 @@ def obter_taxas_cdi():
             df_anual = df.resample('YE').last() # Pega o último valor do ano
 
             # Calcular a taxa acumulada do ano
-            df_anual['valor_acumulado'] = (df_anual['fator_acumulado']/ df['fator_acumulado'].shift(1) - 1) * 100
+            df_anual['valor_acumulado'] = (df_anual['fator_acumulado']/ df_anual['fator_acumulado'].shift(1) - 1) * 100
 
             # Resetar índice para usar como coluna no gráfico
             df_anual = df_anual.reset_index()
@@ -77,6 +77,7 @@ def obter_taxas_cdi():
             # Renomear colunas para o gráfico
             df_anual.columns = ['Ano', 'Valor_Medido', 'Fator_Acumulado', 'Valor_Acumulado']
 
+            df_anual['Ano'] = df_anual['Ano'].dt.year
             # Retornar apenas a coluna de valores
             return df_anual
     
